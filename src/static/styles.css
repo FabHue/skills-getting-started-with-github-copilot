@@ -174,8 +174,8 @@ footer {
 
 /* Bulleted participants list */
 .participants-list {
-  list-style: disc;
-  margin: 8px 0 0 20px;
+  list-style: none; /* hide default bullets */
+  margin: 8px 0 0 0;
   padding: 0;
   max-height: 120px;
   overflow: auto;
@@ -185,6 +185,22 @@ footer {
   margin-bottom: 6px;
   color: #333;
   word-break: break-word;
+}
+
+/* delete button styling */
+.delete-participant {
+  margin-left: 8px;
+  background: transparent;
+  border: none;
+  color: #c62828;
+  cursor: pointer;
+  font-size: 14px;
+}
+.delete-participant:hover {
+  color: #a50f0f;
+}
+.participant-email {
+  display: inline-block;
 }
 
 /* subtle divider between meta and participants */

@@ -12,6 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function createParticipantsSection(participants = []) {
+    // note: will be called with (participants, activityName) by renderActivityCard
     const container = document.createElement("div");
     container.className = "participants";
     const header = document.createElement("h5");
@@ -24,9 +25,48 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const list = document.createElement("ul");
     list.className = "participants-list";
-    participants.forEach((p) => {
+
+    function createParticipantListItem(email, activityName) {
       const li = document.createElement("li");
-      li.textContent = p;
+      const span = document.createElement("span");
+      span.className = "participant-email";
+      span.textContent = email;
+
+      const btn = document.createElement("button");
+      btn.className = "delete-participant";
+      btn.title = `Remove ${email}`;
+      btn.type = "button";
+      btn.textContent = "✖";
+      btn.addEventListener("click", async () => {
+        try {
+          const encoded = encodeURIComponent(activityName);
+          const res = await fetch(`/activities/${encoded}/unregister?email=${encodeURIComponent(email)}`, {
+            method: "POST",
+          });
+          if (res.ok) {
+            li.remove();
+            const cnt = container.querySelector(".participants-count");
+            cnt.textContent = parseInt(cnt.textContent || "0", 10) - 1;
+            showMessage(`Unregistered ${email} from ${activityName}`, "info");
+          } else {
+            const data = await res.json().catch(() => null);
+            showMessage(data?.detail || "Unregister failed", "error");
+          }
+        } catch (err) {
+          console.error(err);
+          showMessage("Unregister failed (network error)", "error");
+        }
+      });
+
+      li.appendChild(span);
+      li.appendChild(btn);
+      return li;
+    }
+
+    participants.forEach((p) => {
+      // when createParticipantsSection is called from renderActivityCard, the second arg
+      // will be the activity name and stored below in container.dataset.activityName
+      const li = createParticipantListItem(p, container.dataset.activityName || "");
       list.appendChild(li);
     });
     container.appendChild(list);
@@ -57,13 +97,43 @@ document.addEventListener("DOMContentLoaded", () => {
     card.appendChild(meta);
 
     const participantsSection = createParticipantsSection(activity.participants || []);
+    // store activity name for use when creating participant list items
+    participantsSection.dataset.activityName = name;
     card.appendChild(participantsSection);
 
     // updater function
     function addParticipant(email) {
       const ul = participantsSection.querySelector(".participants-list");
+      // create list item with delete button
       const li = document.createElement("li");
-      li.textContent = email;
+      const span = document.createElement("span");
+      span.className = "participant-email";
+      span.textContent = email;
+      const btn = document.createElement("button");
+      btn.className = "delete-participant";
+      btn.type = "button";
+      btn.textContent = "✖";
+      btn.title = `Remove ${email}`;
+      btn.addEventListener("click", async () => {
+        try {
+          const encoded = encodeURIComponent(name);
+          const res = await fetch(`/activities/${encoded}/unregister?email=${encodeURIComponent(email)}`, { method: "POST" });
+          if (res.ok) {
+            li.remove();
+            const cnt = participantsSection.querySelector(".participants-count");
+            cnt.textContent = parseInt(cnt.textContent || "0", 10) - 1;
+            showMessage(`Unregistered ${email} from ${name}`, "info");
+          } else {
+            const data = await res.json().catch(() => null);
+            showMessage(data?.detail || "Unregister failed", "error");
+          }
+        } catch (err) {
+          console.error(err);
+          showMessage("Unregister failed (network error)", "error");
+        }
+      });
+      li.appendChild(span);
+      li.appendChild(btn);
       ul.appendChild(li);
       const cnt = participantsSection.querySelector(".participants-count");
       cnt.textContent = parseInt(cnt.textContent || "0", 10) + 1;
@@ -138,11 +208,10 @@ document.addEventListener("DOMContentLoaded", () => {
         method: "POST",
       });
       if (res.ok) {
-        const updaters = signupForm.updaters || new Map();
-        const updater = updaters.get(activityName);
-        if (updater) updater(email);
-        showMessage(`Signed up ${email} for ${activityName}`, "success");
-        signupForm.reset();
+          // refresh activities from server so the participants list is up-to-date
+          await loadActivities();
+          showMessage(`Signed up ${email} for ${activityName}`, "success");
+          signupForm.reset();
       } else {
         const data = await res.json().catch(() => null);
         showMessage(data?.detail || "Signup failed", "error");

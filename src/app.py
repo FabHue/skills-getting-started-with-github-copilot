@@ -92,11 +92,21 @@ def get_activities():
 def signup_for_activity(activity_name: str, email: str):
     """Sign up a student for an activity"""
     # Validate activity exists
-    if activity_name not in activities:
-        raise HTTPException(status_code=404, detail="Activity not found")
+    # Try to locate the activity (supports grouped activities like "Gym Class - Soccer Team")
+    def _find_activity(name: str):
+        if name in activities and isinstance(activities[name], dict) and "participants" in activities[name]:
+            return activities[name]
+        # search grouped activities
+        for group_name, group_val in activities.items():
+            if isinstance(group_val, dict):
+                for sub_name, sub_val in group_val.items():
+                    if sub_name == name or f"{group_name} - {sub_name}" == name:
+                        return sub_val
+        return None
 
-    # Get the specific activity
-    activity = activities[activity_name]
+    activity = _find_activity(activity_name)
+    if activity is None:
+        raise HTTPException(status_code=404, detail="Activity not found")
 
     # Validate student is not already signed up
     if email in activity["participants"]:
@@ -105,3 +115,27 @@ def signup_for_activity(activity_name: str, email: str):
     # Add student
     activity["participants"].append(email)
     return {"message": f"Signed up {email} for {activity_name}"}
+
+
+@app.post("/activities/{activity_name}/unregister")
+def unregister_from_activity(activity_name: str, email: str):
+    """Unregister a student from an activity"""
+    def _find_activity(name: str):
+        if name in activities and isinstance(activities[name], dict) and "participants" in activities[name]:
+            return activities[name]
+        for group_name, group_val in activities.items():
+            if isinstance(group_val, dict):
+                for sub_name, sub_val in group_val.items():
+                    if sub_name == name or f"{group_name} - {sub_name}" == name:
+                        return sub_val
+        return None
+
+    activity = _find_activity(activity_name)
+    if activity is None:
+        raise HTTPException(status_code=404, detail="Activity not found")
+
+    if email not in activity.get("participants", []):
+        raise HTTPException(status_code=404, detail="Student not registered for this activity")
+
+    activity["participants"].remove(email)
+    return {"message": f"Unregistered {email} from {activity_name}"}
